@@ -1,0 +1,11 @@
+package com.example.crimeplatformapi.repository;
+
+import com.example.crimeplatformapi.entity.CasePersons;
+import com.example.crimeplatformapi.entity.CasePersonsId;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface CasePersonsRepository extends JpaRepository<CasePersons, CasePersonsId> {
+    // 中间表实体的 Repository，主键类型是我们之前创建的复合主键类 CasePersonsId
+}
