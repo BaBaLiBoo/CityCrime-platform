@@ -19,23 +19,25 @@ public class PersonService {
         return personsRepository.findAll();
     }
 
-    public Persons findPersonById(Integer personId) {
-        return personsRepository.findById(personId)
-                .orElseThrow(() -> new ResourceNotFoundException("未找到ID为 " + personId + " 的人员"));
+    public Persons findById(String idNumber) {
+        return personsRepository.findById(idNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到身份证号为 " + idNumber + " 的人员"));
     }
 
     @Transactional
     public Persons createPerson(Persons person) {
-        // 可以在此添加逻辑，例如检查身份证号是否已存在
+        // 检查身份证号是否已存在
+        if (personsRepository.existsById(person.getIdNumber())) {
+            throw new IllegalArgumentException("身份证号 " + person.getIdNumber() + " 已存在");
+        }
         return personsRepository.save(person);
     }
 
     @Transactional
-    public Persons updatePerson(Integer personId, Persons personDetails) {
-        Persons existingPerson = findPersonById(personId);
+    public Persons update(String idNumber, Persons personDetails) {
+        Persons existingPerson = findById(idNumber);
         
         existingPerson.setName(personDetails.getName());
-        existingPerson.setIdNumber(personDetails.getIdNumber());
         existingPerson.setGender(personDetails.getGender());
         existingPerson.setBirthDate(personDetails.getBirthDate());
         existingPerson.setAddress(personDetails.getAddress());
@@ -45,10 +47,10 @@ public class PersonService {
     }
 
     @Transactional
-    public void deletePerson(Integer personId) {
-        if (!personsRepository.existsById(personId)) {
-            throw new ResourceNotFoundException("删除人员失败：未找到ID为 " + personId + " 的人员");
+    public void delete(String idNumber) {
+        if (!personsRepository.existsById(idNumber)) {
+            throw new ResourceNotFoundException("删除人员失败：未找到身份证号为 " + idNumber + " 的人员");
         }
-        personsRepository.deleteById(personId);
+        personsRepository.deleteById(idNumber);
     }
 }

@@ -33,11 +33,31 @@ public class PersonController {
         return new ResponseEntity<>(convertToDto(newPerson), HttpStatus.CREATED);
     }
 
+    // GET /api/persons/{id} - 查询人员
+    @GetMapping("/{id}")
+    public ResponseEntity<PersonDTO> getPerson(@PathVariable String id) {
+        Persons p = personService.findById(id);
+        return ResponseEntity.ok(convertToDto(p));
+    }
+
+    // PUT /api/persons/{id} - 更新人员
+    @PutMapping("/{id}")
+    public ResponseEntity<PersonDTO> updatePerson(@PathVariable String id, @RequestBody Persons payload) {
+        Persons p = personService.update(id, payload);
+        return ResponseEntity.ok(convertToDto(p));
+    }
+
+    // DELETE /api/persons/{id} - 删除人员
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deletePerson(@PathVariable String id) {
+        personService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+
     private PersonDTO convertToDto(Persons entity) {
         return new PersonDTO(
-            entity.getPersonId(),
-            entity.getName(),
             entity.getIdNumber(),
+            entity.getName(),
             entity.getGender(),
             entity.getBirthDate(),
             entity.getAddress(),

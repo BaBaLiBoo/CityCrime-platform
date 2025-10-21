@@ -1,0 +1,313 @@
+<template>
+  <div class="case-timeline">
+    <h3>案件状态时间轴</h3>
+    <el-timeline>
+      <el-timeline-item
+        v-for="(item, index) in timelineItems"
+        :key="index"
+        :timestamp="item.timestamp"
+        :type="item.type"
+        :color="item.color"
+        :icon="item.icon"
+      >
+        <div class="timeline-content">
+          <div class="timeline-title" :class="item.statusClass">
+            {{ item.title }}
+          </div>
+          <div class="timeline-description" v-if="item.description">
+            {{ item.description }}
+          </div>
+        </div>
+      </el-timeline-item>
+    </el-timeline>
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue';
+import { 
+  DocumentAdd, 
+  Check, 
+  Search, 
+  Files 
+} from '@element-plus/icons-vue';
+
+const props = defineProps({
+  caseData: {
+    type: Object,
+    required: true
+  }
+});
+
+// 计算时间轴项目
+const timelineItems = computed(() => {
+  const items = [];
+  const { status, reportTime, filingTime, solveTime, archiveTime } = props.caseData;
+  
+  // 调试信息
+  console.log('时间轴组件接收到的数据:', {
+    status,
+    reportTime,
+    filingTime,
+    solveTime,
+    archiveTime
+  });
+  
+  // 报案状态 - 总是显示
+  items.push({
+    title: '案件报案',
+    timestamp: reportTime ? formatDateTime(reportTime) : '未知时间',
+    type: 'primary',
+    color: '#409EFF',
+    icon: DocumentAdd,
+    statusClass: 'completed',
+    description: '案件已接报，开始处理流程'
+  });
+  
+  // 立案状态
+  if (filingTime) {
+    items.push({
+      title: '案件立案',
+      timestamp: formatDateTime(filingTime),
+      type: 'success',
+      color: '#67C23A',
+      icon: Check,
+      statusClass: 'completed',
+      description: '案件已正式立案，进入侦查阶段'
+    });
+  } else if (status === '立案侦查' || status === '已告破' || status === '已归档') {
+    items.push({
+      title: '案件立案',
+      timestamp: '待完成',
+      type: 'warning',
+      color: '#E6A23C',
+      icon: Check,
+      statusClass: 'current',
+      description: '案件已立案，但立案时间未记录'
+    });
+  } else {
+    items.push({
+      title: '案件立案',
+      timestamp: '未到达',
+      type: 'info',
+      color: '#909399',
+      icon: Check,
+      statusClass: 'pending',
+      description: '案件尚未立案'
+    });
+  }
+  
+  // 侦破状态
+  if (solveTime) {
+    items.push({
+      title: '案件侦破',
+      timestamp: formatDateTime(solveTime),
+      type: 'success',
+      color: '#67C23A',
+      icon: Search,
+      statusClass: 'completed',
+      description: '案件已成功侦破'
+    });
+  } else if (status === '已告破' || status === '已归档') {
+    items.push({
+      title: '案件侦破',
+      timestamp: '待完成',
+      type: 'warning',
+      color: '#E6A23C',
+      icon: Search,
+      statusClass: 'current',
+      description: '案件已侦破，但侦破时间未记录'
+    });
+  } else {
+    items.push({
+      title: '案件侦破',
+      timestamp: '未到达',
+      type: 'info',
+      color: '#909399',
+      icon: Search,
+      statusClass: 'pending',
+      description: '案件尚未侦破'
+    });
+  }
+  
+  // 归档状态
+  if (archiveTime) {
+    items.push({
+      title: '案件归档',
+      timestamp: formatDateTime(archiveTime),
+      type: 'success',
+      color: '#67C23A',
+      icon: Files,
+      statusClass: 'completed',
+      description: '案件已归档，流程结束'
+    });
+  } else if (status === '已归档') {
+    items.push({
+      title: '案件归档',
+      timestamp: '待完成',
+      type: 'warning',
+      color: '#E6A23C',
+      icon: Files,
+      statusClass: 'current',
+      description: '案件已归档，但归档时间未记录'
+    });
+  } else {
+    items.push({
+      title: '案件归档',
+      timestamp: '未到达',
+      type: 'info',
+      color: '#909399',
+      icon: Files,
+      statusClass: 'pending',
+      description: '案件尚未归档'
+    });
+  }
+  
+  return items;
+});
+
+// 格式化日期时间
+const formatDateTime = (dateTime) => {
+  console.log('formatDateTime 输入:', dateTime, '类型:', typeof dateTime);
+  
+  if (!dateTime) {
+    console.log('时间为空，返回空字符串');
+    return '';
+  }
+  
+  try {
+    let date;
+    
+    // 处理不同的时间格式
+    if (typeof dateTime === 'string') {
+      console.log('处理字符串时间:', dateTime);
+      
+      // 如果是字符串，尝试解析
+      if (dateTime.includes('T')) {
+        // ISO 格式：2024-01-15T10:30:00
+        console.log('检测到ISO格式');
+        date = new Date(dateTime);
+      } else if (dateTime.includes(' ')) {
+        // 空格格式：2024-01-15 10:30:00
+        console.log('检测到空格格式，转换为ISO格式');
+        date = new Date(dateTime.replace(' ', 'T'));
+      } else {
+        // 其他格式直接尝试解析
+        console.log('尝试直接解析');
+        date = new Date(dateTime);
+      }
+    } else if (dateTime instanceof Date) {
+      console.log('处理Date对象');
+      date = dateTime;
+    } else {
+      // 其他类型尝试转换
+      console.log('处理其他类型:', typeof dateTime);
+      date = new Date(dateTime);
+    }
+    
+    console.log('解析后的Date对象:', date);
+    
+    // 检查日期是否有效
+    if (isNaN(date.getTime())) {
+      console.warn('无效的日期时间:', dateTime);
+      return '时间格式错误';
+    }
+    
+    const formatted = date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    
+    console.log('格式化结果:', formatted);
+    return formatted;
+  } catch (error) {
+    console.error('日期格式化错误:', error, '原始值:', dateTime);
+    return '时间格式错误';
+  }
+};
+</script>
+
+<style scoped>
+.case-timeline {
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.case-timeline h3 {
+  margin: 0 0 20px 0;
+  color: #303133;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.timeline-content {
+  padding: 8px 0;
+}
+
+.timeline-title {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.timeline-title.completed {
+  color: #909399;
+}
+
+.timeline-title.current {
+  color: #67C23A;
+  font-weight: bold;
+}
+
+.timeline-title.pending {
+  color: #303133;
+}
+
+.timeline-description {
+  font-size: 14px;
+  color: #606266;
+  line-height: 1.4;
+}
+
+/* 自定义时间轴样式 */
+:deep(.el-timeline-item__timestamp) {
+  font-size: 13px;
+  color: #909399;
+}
+
+:deep(.el-timeline-item__node) {
+  width: 12px;
+  height: 12px;
+}
+
+:deep(.el-timeline-item__tail) {
+  border-left: 2px solid #e4e7ed;
+}
+
+/* 不同状态的图标颜色 */
+:deep(.el-timeline-item__icon) {
+  color: #fff;
+}
+
+:deep(.el-timeline-item__icon.is-primary) {
+  background-color: #409EFF;
+}
+
+:deep(.el-timeline-item__icon.is-success) {
+  background-color: #67C23A;
+}
+
+:deep(.el-timeline-item__icon.is-warning) {
+  background-color: #E6A23C;
+}
+
+:deep(.el-timeline-item__icon.is-info) {
+  background-color: #909399;
+}
+</style>

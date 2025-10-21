@@ -7,6 +7,9 @@ public record CreateCaseRequest(
         String caseType,
         String status,
         LocalDateTime reportTime,
+        LocalDateTime filingTime,
+        LocalDateTime solveTime,
+        LocalDateTime archiveTime,
         String description,
         String locationAddress
 ) {}

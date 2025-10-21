@@ -9,8 +9,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.Set;
+import java.util.HashSet;
 
 @RestController
 @RequestMapping("/api/cases")
@@ -51,9 +53,14 @@ public class CaseController {
      * @return ResponseEntity<CaseDTO>
      */
     @PostMapping
-    public ResponseEntity<CaseDTO> createCase(@RequestBody CreateCaseRequest request) {
-        Cases createdCase = caseService.createCase(request);
-        return new ResponseEntity<>(convertToCaseDTO(createdCase), HttpStatus.CREATED);
+    public ResponseEntity<?> createCase(@RequestBody CreateCaseRequest request) {
+        try {
+            Cases createdCase = caseService.createCase(request);
+            return new ResponseEntity<>(convertToCaseDTO(createdCase), HttpStatus.CREATED);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("message", "创建案件失败: " + e.getMessage()));
+        }
     }
 
     /**
@@ -98,13 +105,39 @@ public class CaseController {
      * 将一个涉案人员（嫌疑人/受害人/证人）关联到一个案件
      * POST /api/cases/{caseId}/persons
      * @param caseId 案件ID
-     * @param request 包含 personId 和 roleInCase 的请求体
+     * @param request 包含 idNumber 和 roleInCase 的请求体
      * @return ResponseEntity<CaseDetailDTO> 返回更新后的案件详情
      */
     @PostMapping("/{caseId}/persons")
     public ResponseEntity<CaseDetailDTO> addPersonToCase(@PathVariable Integer caseId, @RequestBody AddPersonRequest request) {
-        caseService.addPersonToCase(caseId, request.personId(), request.roleInCase());
+        caseService.addPersonToCase(caseId, request.idNumber(), request.roleInCase());
         Cases updatedCase = caseService.findCaseById(caseId); // 重新获取案件以展示最新关联
+        return ResponseEntity.ok(convertToCaseDetailDTO(updatedCase));
+    }
+    
+    /**
+     * 从案件中移除一名办案警员
+     * DELETE /api/cases/{caseId}/officers/{officerId}
+     * @param caseId 案件ID
+     * @param officerId 警员ID
+     * @return ResponseEntity<CaseDetailDTO> 返回更新后的案件详情
+     */
+    @DeleteMapping("/{caseId}/officers/{officerId}")
+    public ResponseEntity<CaseDetailDTO> removeOfficerFromCase(@PathVariable Integer caseId, @PathVariable String officerId) {
+        Cases updatedCase = caseService.removeOfficerFromCase(caseId, officerId);
+        return ResponseEntity.ok(convertToCaseDetailDTO(updatedCase));
+    }
+    
+    /**
+     * 从案件中移除一名涉案人员
+     * DELETE /api/cases/{caseId}/persons/{idNumber}
+     * @param caseId 案件ID
+     * @param idNumber 人员身份证号
+     * @return ResponseEntity<CaseDetailDTO> 返回更新后的案件详情
+     */
+    @DeleteMapping("/{caseId}/persons/{idNumber}")
+    public ResponseEntity<CaseDetailDTO> removePersonFromCase(@PathVariable Integer caseId, @PathVariable String idNumber) {
+        Cases updatedCase = caseService.removePersonFromCase(caseId, idNumber);
         return ResponseEntity.ok(convertToCaseDetailDTO(updatedCase));
     }
 
@@ -124,6 +157,9 @@ public class CaseController {
                 entity.getCaseType(),
                 entity.getStatus(),
                 entity.getReportTime(),
+                entity.getFilingTime(),
+                entity.getSolveTime(),
+                entity.getArchiveTime(),
                 address
         );
     }
@@ -145,28 +181,32 @@ public class CaseController {
         }
 
         // 转换办案警员信息
-        Set<OfficerDTO> officerDTOs = entity.getOfficers().stream().map(officer -> new OfficerDTO(
-                officer.getOfficerId(),
-                officer.getDepartment(),
-                officer.getPosition(),
-                new PersonDTO( // 嵌套警员的基础信息
-                        officer.getPerson().getPersonId(),
-                        officer.getPerson().getName(),
-                        officer.getPerson().getIdNumber(),
-                        officer.getPerson().getGender(),
-                        officer.getPerson().getBirthDate(),
-                        officer.getPerson().getAddress(),
-                        officer.getPerson().getContactInfo()
-                )
-        )).collect(Collectors.toSet());
+        Set<OfficerDTO> officerDTOs = new HashSet<>();
+        if (entity.getOfficers() != null && !entity.getOfficers().isEmpty()) {
+            officerDTOs = entity.getOfficers().stream().map(officer -> new OfficerDTO(
+                    officer.getOfficerId(),
+                    officer.getDepartment(),
+                    officer.getPosition(),
+                    new PersonDTO( // 嵌套警员的基础信息
+                            officer.getIdNumber(),
+                            officer.getName(),
+                            officer.getGender(),
+                            officer.getBirthDate(),
+                            officer.getAddress(),
+                            officer.getContactInfo()
+                    )
+            )).collect(Collectors.toSet());
+        }
 
         // 转换涉案人员信息
-        Set<CasePersonDTO> casePersonDTOs = entity.getCasePersons().stream().map(casePerson -> new CasePersonDTO(
-                casePerson.getPerson().getPersonId(),
-                casePerson.getPerson().getName(),
-                casePerson.getPerson().getIdNumber(),
-                casePerson.getRoleInCase()
-        )).collect(Collectors.toSet());
+        Set<CasePersonDTO> casePersonDTOs = new HashSet<>();
+        if (entity.getCasePersons() != null && !entity.getCasePersons().isEmpty()) {
+            casePersonDTOs = entity.getCasePersons().stream().map(casePerson -> new CasePersonDTO(
+                    casePerson.getPerson().getIdNumber(),
+                    casePerson.getPerson().getName(),
+                    casePerson.getId().getRoleInCase()
+            )).collect(Collectors.toSet());
+        }
 
 
         return new CaseDetailDTO(
@@ -175,6 +215,9 @@ public class CaseController {
                 entity.getCaseType(),
                 entity.getStatus(),
                 entity.getReportTime(),
+                entity.getFilingTime(),
+                entity.getSolveTime(),
+                entity.getArchiveTime(),
                 entity.getDescription(),
                 locationDTO,
                 officerDTOs,

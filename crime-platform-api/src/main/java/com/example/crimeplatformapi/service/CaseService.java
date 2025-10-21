@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class CaseService {
@@ -29,12 +30,15 @@ public class CaseService {
     private CasePersonsRepository casePersonsRepository;
 
     public List<Cases> findAllCases() {
-        return casesRepository.findAll();
+        return casesRepository.findAllWithLocation();
     }
 
     public Cases findCaseById(Integer caseId) {
-        return casesRepository.findById(caseId)
-                .orElseThrow(() -> new ResourceNotFoundException("未找到ID为 " + caseId + " 的案件"));
+        Cases caseEntity = casesRepository.findByIdWithLocation(caseId);
+        if (caseEntity == null) {
+            throw new ResourceNotFoundException("未找到ID为 " + caseId + " 的案件");
+        }
+        return caseEntity;
     }
 
     @Transactional
@@ -53,6 +57,9 @@ public class CaseService {
         newCase.setCaseType(request.caseType());
         newCase.setStatus(request.status());
         newCase.setReportTime(request.reportTime());
+        newCase.setFilingTime(request.filingTime());
+        newCase.setSolveTime(request.solveTime());
+        newCase.setArchiveTime(request.archiveTime());
         newCase.setDescription(request.description());
         newCase.setLocation(savedLocation); // 关联新地点
 
@@ -63,17 +70,28 @@ public class CaseService {
     public Cases updateCase(Integer caseId, CreateCaseRequest request) {
         Cases existingCase = findCaseById(caseId);
 
-        // --- 核心修改：同样直接创建新地点 ---
-        Locations newLocation = new Locations();
-        newLocation.setAddress(request.locationAddress());
-        Locations savedLocation = locationsRepository.save(newLocation);
+        // 更新现有案件的地点信息，而不是创建新地点
+        if (existingCase.getLocation() != null) {
+            // 更新现有地点
+            existingCase.getLocation().setAddress(request.locationAddress());
+            locationsRepository.save(existingCase.getLocation());
+        } else {
+            // 如果案件没有地点，创建新地点
+            Locations newLocation = new Locations();
+            newLocation.setAddress(request.locationAddress());
+            Locations savedLocation = locationsRepository.save(newLocation);
+            existingCase.setLocation(savedLocation);
+        }
 
+        // 更新案件信息
         existingCase.setCaseTitle(request.caseTitle());
         existingCase.setCaseType(request.caseType());
         existingCase.setStatus(request.status());
         existingCase.setReportTime(request.reportTime());
+        existingCase.setFilingTime(request.filingTime());
+        existingCase.setSolveTime(request.solveTime());
+        existingCase.setArchiveTime(request.archiveTime());
         existingCase.setDescription(request.description());
-        existingCase.setLocation(savedLocation);
 
         return casesRepository.save(existingCase);
     }
@@ -96,22 +114,48 @@ public class CaseService {
     }
 
     @Transactional
-    public CasePersons addPersonToCase(Integer caseId, Integer personId, String roleInCase) {
+    public Cases addPersonToCase(Integer caseId, String idNumber, String roleInCase) {
         Cases currentCase = findCaseById(caseId);
-        Persons person = personsRepository.findById(personId)
-                .orElseThrow(() -> new ResourceNotFoundException("关联涉案人员失败：未找到ID为 " + personId + " 的人员"));
+        Persons person = personsRepository.findById(idNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("关联涉案人员失败：未找到身份证号为 " + idNumber + " 的人员"));
 
-        CasePersonsId casePersonsId = new CasePersonsId();
-        casePersonsId.setCaseId(caseId);
-        casePersonsId.setPersonId(personId);
-        casePersonsId.setRoleInCase(roleInCase);
+            CasePersonsId casePersonsId = new CasePersonsId();
+            casePersonsId.setCaseId(caseId);
+            casePersonsId.setIdNumber(idNumber);
+            casePersonsId.setRoleInCase(roleInCase);
 
-        CasePersons casePerson = new CasePersons();
-        casePerson.setId(casePersonsId);
-        casePerson.setCases(currentCase);
-        casePerson.setPerson(person);
-        casePerson.setRoleInCase(roleInCase);
+            CasePersons casePerson = new CasePersons();
+            casePerson.setId(casePersonsId);
+            casePerson.setCases(currentCase);
+            casePerson.setPerson(person);
 
-        return casePersonsRepository.save(casePerson);
+        casePersonsRepository.save(casePerson);
+        return currentCase;
+    }
+    
+    @Transactional
+    public Cases removeOfficerFromCase(Integer caseId, String officerId) {
+        Cases currentCase = findCaseById(caseId);
+        Officers officer = officersRepository.findById(officerId)
+                .orElseThrow(() -> new ResourceNotFoundException("移除警员失败：未找到ID为 " + officerId + " 的警员"));
+        currentCase.getOfficers().remove(officer);
+        return casesRepository.save(currentCase);
+    }
+    
+    @Transactional
+    public Cases removePersonFromCase(Integer caseId, String idNumber) {
+        Cases currentCase = findCaseById(caseId);
+        // 验证人员是否存在
+        personsRepository.findById(idNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("移除涉案人员失败：未找到身份证号为 " + idNumber + " 的人员"));
+        
+        // 查找该人员在案件中的所有角色记录
+        List<CasePersons> casePersonsToDelete = casePersonsRepository.findAll().stream()
+                .filter(cp -> cp.getId().getCaseId().equals(caseId) && cp.getId().getIdNumber().equals(idNumber))
+                .collect(Collectors.toList());
+        
+        // 删除所有匹配的记录
+        casePersonsRepository.deleteAll(casePersonsToDelete);
+        return currentCase;
     }
 }

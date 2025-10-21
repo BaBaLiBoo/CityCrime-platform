@@ -29,6 +29,9 @@ CREATE TABLE `Cases` (
     `case_type` VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '案件类型',
     `status` ENUM('已接报', '立案侦查', '已告破', '已归档') NOT NULL DEFAULT '已接报' COMMENT '案件状态',
     `report_time` DATETIME NOT NULL COMMENT '报案时间',
+    `filing_time` DATETIME NULL COMMENT '立案时间',
+    `solve_time` DATETIME NULL COMMENT '侦破时间',
+    `archive_time` DATETIME NULL COMMENT '归档时间',
     `description` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '案件详细描述',
     `location_id` INT,
     FOREIGN KEY (`location_id`) REFERENCES `Locations`(`location_id`) ON DELETE SET NULL ON UPDATE CASCADE
@@ -48,16 +51,20 @@ CREATE TABLE `Persons` (
 -- 表: Officers (办案人员（警员）的特定信息表)
 CREATE TABLE `Officers` (
     `officer_id` VARCHAR(20) PRIMARY KEY COMMENT '警员编号作为主键',
-    `person_id` INT UNIQUE NOT NULL,
     `department` VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '所属部门',
     `position` VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '职务',
-    FOREIGN KEY (`person_id`) REFERENCES `Persons`(`person_id`) ON DELETE CASCADE ON UPDATE CASCADE
+    `name` VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '姓名',
+    `id_number` VARCHAR(18) NOT NULL COMMENT '身份证号',
+    `gender` ENUM('男', '女', '未知') NOT NULL DEFAULT '未知' COMMENT '性别',
+    `birth_date` DATE COMMENT '出生日期',
+    `address` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '住址',
+    `contact_info` VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '联系方式'
 ) ENGINE=InnoDB COMMENT='办案人员（警员）的特定信息表';
 
 -- 表: UserAccounts (系统登录账户表)
 CREATE TABLE `UserAccounts` (
     `user_id` INT AUTO_INCREMENT PRIMARY KEY,
-    `officer_id` VARCHAR(20) UNIQUE NOT NULL,
+    `officer_id` VARCHAR(20) NULL,
     `username` VARCHAR(50) UNIQUE NOT NULL COMMENT '登录用户名',
     `password_hash` VARCHAR(255) NOT NULL COMMENT '哈希后的密码',
     `is_active` TINYINT(1) DEFAULT 1 COMMENT '账户是否激活 (1=是, 0=否)',
@@ -82,11 +89,11 @@ CREATE TABLE `Permissions` (
 -- 步骤 3: 创建关联表和索引
 CREATE TABLE `Case_Persons` (
     `case_id` INT,
-    `person_id` INT,
+    `id_number` VARCHAR(18),
     `role_in_case` ENUM('嫌疑人', '受害人', '证人') NOT NULL,
-    PRIMARY KEY (`case_id`, `person_id`, `role_in_case`),
+    PRIMARY KEY (`case_id`, `id_number`, `role_in_case`),
     FOREIGN KEY (`case_id`) REFERENCES `Cases`(`case_id`) ON DELETE CASCADE ON UPDATE CASCADE,
-    FOREIGN KEY (`person_id`) REFERENCES `Persons`(`person_id`) ON DELETE CASCADE ON UPDATE CASCADE
+    FOREIGN KEY (`id_number`) REFERENCES `Persons`(`id_number`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB COMMENT='连接案件与涉案人员的多对多关系表';
 
 CREATE TABLE `Case_Officers` (

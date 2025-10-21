@@ -1,0 +1,457 @@
+<template>
+  <div class="home-container">
+    <!-- 欢迎横幅 -->
+    <el-card class="welcome-card">
+      <div class="welcome-content">
+        <div class="welcome-text">
+          <h1>欢迎使用上海市犯罪事件管理平台</h1>
+          <p class="current-date">{{ currentDate }}</p>
+          <p class="welcome-desc">高效管理犯罪事件，提升执法效率</p>
+        </div>
+        <div class="welcome-stats">
+          <el-statistic title="今日新增案件" :value="todayStats.newCases" />
+          <el-statistic title="待办案件" :value="todayStats.pendingCases" />
+          <el-statistic title="本月结案" :value="todayStats.closedCases" />
+        </div>
+      </div>
+    </el-card>
+
+    <!-- 快速操作 -->
+    <el-row :gutter="20" class="quick-actions">
+      <el-col :span="6">
+        <el-card class="action-card" @click="navigateTo('/cases/create')">
+          <div class="action-content">
+            <el-icon size="40" color="#409EFF"><DocumentAdd /></el-icon>
+            <h3>新增案件</h3>
+            <p>快速登记新的犯罪事件</p>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card class="action-card" @click="navigateTo('/cases')">
+          <div class="action-content">
+            <el-icon size="40" color="#67C23A"><List /></el-icon>
+            <h3>案件列表</h3>
+            <p>查看和管理所有案件</p>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card class="action-card" @click="navigateTo('/persons/create')">
+          <div class="action-content">
+            <el-icon size="40" color="#E6A23C"><User /></el-icon>
+            <h3>登记人员</h3>
+            <p>录入相关人员信息</p>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card class="action-card" @click="navigateTo('/dashboard')">
+          <div class="action-content">
+            <el-icon size="40" color="#F56C6C"><DataAnalysis /></el-icon>
+            <h3>数据统计</h3>
+            <p>查看详细数据分析</p>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 今日概览 -->
+    <el-row :gutter="20" class="overview-section">
+      <el-col :span="12">
+        <el-card>
+          <template #header>
+            <div class="card-header">
+              <span>今日案件概览</span>
+              <el-button type="primary" size="small" @click="refreshStats">刷新</el-button>
+            </div>
+          </template>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <div class="stat-number">{{ todayStats.newCases }}</div>
+              <div class="stat-label">新增案件</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number">{{ todayStats.pendingCases }}</div>
+              <div class="stat-label">待办案件</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number">{{ todayStats.inProgressCases }}</div>
+              <div class="stat-label">处理中</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number">{{ todayStats.closedCases }}</div>
+              <div class="stat-label">已结案</div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="12">
+        <el-card>
+          <template #header>
+            <div class="card-header">
+              <span>最近案件</span>
+              <el-button type="text" @click="navigateTo('/cases')">查看全部</el-button>
+            </div>
+          </template>
+          <el-table :data="recentCases" size="small" max-height="200">
+            <el-table-column prop="caseTitle" label="案件标题" />
+            <el-table-column prop="caseType" label="类型" width="100" />
+            <el-table-column prop="status" label="状态" width="100">
+              <template #default="scope">
+                <el-tag :type="getStatusType(scope.row.status)" size="small">
+                  {{ scope.row.status }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="reportTime" label="报案时间" width="120" />
+          </el-table>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 系统通知 -->
+    <el-card class="notification-card">
+      <template #header>
+        <div class="card-header">
+          <span>系统通知</span>
+          <el-badge :value="notifications.length" class="notification-badge">
+            <el-icon><Bell /></el-icon>
+          </el-badge>
+        </div>
+      </template>
+      <div class="notification-list">
+        <div v-for="notification in notifications" :key="notification.id" class="notification-item">
+          <el-icon :color="notification.type === 'warning' ? '#E6A23C' : '#409EFF'">
+            <component :is="notification.type === 'warning' ? 'Warning' : 'InfoFilled'" />
+          </el-icon>
+          <div class="notification-content">
+            <p class="notification-title">{{ notification.title }}</p>
+            <p class="notification-time">{{ notification.time }}</p>
+          </div>
+        </div>
+      </div>
+    </el-card>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
+import { 
+  DocumentAdd, 
+  List, 
+  User, 
+  DataAnalysis, 
+  Bell, 
+  Warning, 
+  InfoFilled 
+} from '@element-plus/icons-vue';
+import caseApi from '@/api/case.js';
+
+const router = useRouter();
+
+// 当前日期
+const currentDate = ref('');
+
+// 统计数据
+const todayStats = ref({
+  newCases: 0,
+  pendingCases: 0,
+  inProgressCases: 0,
+  closedCases: 0
+});
+
+// 最近案件
+const recentCases = ref([]);
+
+// 系统通知
+const notifications = ref([
+  {
+    id: 1,
+    type: 'info',
+    title: '系统维护通知：本周六凌晨2:00-4:00进行系统维护',
+    time: '2024-01-15 10:30'
+  },
+  {
+    id: 2,
+    type: 'warning',
+    title: '数据备份提醒：请确保重要数据已备份',
+    time: '2024-01-15 09:15'
+  },
+  {
+    id: 3,
+    type: 'info',
+    title: '新功能上线：案件状态时间轴功能已启用',
+    time: '2024-01-14 16:45'
+  }
+]);
+
+// 计算当前日期
+const updateCurrentDate = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+  const weekday = weekdays[now.getDay()];
+  
+  currentDate.value = `${year}年${month}月${day}日 ${weekday}`;
+};
+
+// 统一提取日期部分（兼容 "YYYY-MM-DDTHH:mm:ss" 和 "YYYY-MM-DD HH:mm:ss"）
+const getDatePart = (dateTimeString) => {
+  if (!dateTimeString) return '';
+  try {
+    const s = String(dateTimeString);
+    // 先将空格替换为 T，便于 split('T')
+    const normalized = s.includes('T') ? s : s.replace(' ', 'T');
+    return normalized.split('T')[0];
+  } catch {
+    return '';
+  }
+};
+
+// 获取统计数据
+const fetchStats = async () => {
+  try {
+    const response = await caseApi.getAllCases();
+    const cases = response.data;
+    
+    const today = new Date().toISOString().split('T')[0];
+    
+    // 按照新的逻辑计算统计
+    todayStats.value = {
+      // 新增案件：报案时间为今日（仅看日期部分）
+      newCases: cases.filter(c => {
+        const reportDate = getDatePart(c.reportTime);
+        return reportDate === today;
+      }).length,
+      
+      // 待办案件：已报案但尚未立案（filingTime 为空）
+      pendingCases: cases.filter(c => {
+        return !!c.reportTime && !c.filingTime;
+      }).length,
+      
+      // 处理中：已立案但尚未归档
+      inProgressCases: cases.filter(c => {
+        return !!c.filingTime && !c.archiveTime;
+      }).length,
+      
+      // 已结案：今日内归档（仅看日期部分）
+      closedCases: cases.filter(c => {
+        const archiveDate = getDatePart(c.archiveTime);
+        return archiveDate === today;
+      }).length
+    };
+    
+    // 获取最近案件（按报案时间倒序，取前5个）
+    recentCases.value = cases
+      .sort((a, b) => new Date((a.reportTime || '').replace(' ', 'T')) < new Date((b.reportTime || '').replace(' ', 'T')) ? 1 : -1)
+      .slice(0, 5)
+      .map(c => ({
+        caseTitle: c.caseTitle,
+        caseType: c.caseType,
+        status: c.status,
+        reportTime: getDatePart(c.reportTime) || '未知'
+      }));
+      
+  } catch (error) {
+    console.error('获取统计数据失败:', error);
+    ElMessage.error('获取统计数据失败');
+  }
+};
+
+// 刷新统计数据
+const refreshStats = () => {
+  fetchStats();
+  ElMessage.success('数据已刷新');
+};
+
+// 获取状态标签类型
+const getStatusType = (status) => {
+  const statusMap = {
+    '已接报': 'warning',
+    '立案侦查': 'primary', 
+    '已告破': 'success',
+    '已归档': 'info'
+  };
+  return statusMap[status] || 'info';
+};
+
+// 导航到指定页面
+const navigateTo = (path) => {
+  router.push(path);
+};
+
+// 组件挂载时初始化
+onMounted(() => {
+  updateCurrentDate();
+  fetchStats();
+  
+  // 每分钟更新一次日期（确保跨天时日期正确）
+  setInterval(updateCurrentDate, 60000);
+});
+</script>
+
+<style scoped>
+.home-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.welcome-card {
+  margin-bottom: 20px;
+}
+
+.welcome-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.welcome-text h1 {
+  margin: 0 0 10px 0;
+  color: #303133;
+  font-size: 2rem;
+}
+
+.current-date {
+  font-size: 1.2rem;
+  color: #409EFF;
+  margin: 5px 0;
+  font-weight: 600;
+}
+
+.welcome-desc {
+  color: #606266;
+  margin: 5px 0 0 0;
+}
+
+.welcome-stats {
+  display: flex;
+  gap: 30px;
+}
+
+.quick-actions {
+  margin-bottom: 20px;
+}
+
+.action-card {
+  cursor: pointer;
+  transition: all 0.3s ease;
+  height: 120px;
+}
+
+.action-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.action-content {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.action-content h3 {
+  margin: 10px 0 5px 0;
+  color: #303133;
+}
+
+.action-content p {
+  margin: 0;
+  color: #606266;
+  font-size: 14px;
+}
+
+.overview-section {
+  margin-bottom: 20px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #409EFF;
+  margin-bottom: 5px;
+}
+
+.stat-label {
+  color: #606266;
+  font-size: 14px;
+}
+
+.notification-card {
+  margin-bottom: 20px;
+}
+
+.notification-badge {
+  margin-left: 10px;
+}
+
+.notification-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.notification-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.notification-item:last-child {
+  border-bottom: none;
+}
+
+.notification-content {
+  margin-left: 10px;
+  flex: 1;
+}
+
+.notification-title {
+  margin: 0 0 5px 0;
+  color: #303133;
+  font-size: 14px;
+}
+
+.notification-time {
+  margin: 0;
+  color: #909399;
+  font-size: 12px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .welcome-content {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .welcome-stats {
+    margin-top: 20px;
+    justify-content: center;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+</style>

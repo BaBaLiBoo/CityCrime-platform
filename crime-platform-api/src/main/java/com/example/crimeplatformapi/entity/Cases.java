@@ -30,6 +30,15 @@ public class Cases {
     @Column(name = "report_time", nullable = false)
     private LocalDateTime reportTime;
 
+    @Column(name = "filing_time")
+    private LocalDateTime filingTime; // 立案时间
+
+    @Column(name = "solve_time")
+    private LocalDateTime solveTime; // 侦破时间
+
+    @Column(name = "archive_time")
+    private LocalDateTime archiveTime; // 归档时间
+
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
@@ -50,6 +59,6 @@ public class Cases {
     
     // 一个案件可以涉及多个相关人员(Person)，并且中间表有额外字段`role_in_case`
     // 这种带额外字段的多对多关系，需要将中间表也映射为一个实体
-    @OneToMany(mappedBy = "cases", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "cases", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private Set<CasePersons> casePersons = new HashSet<>();
 }

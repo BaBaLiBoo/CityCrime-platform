@@ -12,15 +12,11 @@ import java.time.LocalDate;
 public class Persons {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "person_id")
-    private Integer personId;
+    @Column(name = "id_number", length = 18)
+    private String idNumber;
 
     @Column(name = "name", nullable = false, length = 50)
     private String name;
-
-    @Column(name = "id_number", nullable = false, unique = true, length = 18)
-    private String idNumber;
 
     @Column(name = "gender", nullable = false)
     private String gender; // ENUM 映射为 String

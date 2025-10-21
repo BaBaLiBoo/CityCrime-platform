@@ -5,8 +5,30 @@
       <el-button type="primary" @click="handleCreate">新建案件</el-button>
     </div>
 
+    <el-card class="mb16">
+      <el-form :inline="true" :model="filters" class="filter-bar">
+        <el-form-item label="类型">
+          <el-input v-model="filters.caseType" placeholder="输入类型" clearable />
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="filters.status" placeholder="全部" clearable style="width: 140px;">
+            <el-option label="已接报" value="已接报" />
+            <el-option label="立案侦查" value="立案侦查" />
+            <el-option label="已告破" value="已告破" />
+            <el-option label="已归档" value="已归档" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="报案时间">
+          <el-date-picker v-model="filters.reportTimeRange" type="datetimerange" start-placeholder="开始" end-placeholder="结束" value-format="YYYY-MM-DDTHH:mm:ss" />
+        </el-form-item>
+        <el-form-item>
+          <el-button @click="resetFilters">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
     <el-card>
-      <el-table :data="cases" v-loading="loading" style="width: 100%">
+      <el-table :data="pagedCases" v-loading="loading" style="width: 100%">
         <el-table-column prop="caseId" label="案件ID" width="100" />
         <el-table-column prop="caseTitle" label="案件标题" width="250" />
         <el-table-column prop="caseType" label="案件类型" width="150" />
@@ -26,7 +48,7 @@
         <el-pagination
           background
           layout="prev, pager, next, total"
-          :total="totalCases"
+          :total="filteredCases.length"
           v-model:current-page="currentPage"
           @current-change="handlePageChange"
         />
@@ -36,7 +58,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import caseApi from '@/api/case.js';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -44,15 +66,15 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 const router = useRouter();
 const cases = ref([]);
 const loading = ref(true);
-const totalCases = ref(0);
 const currentPage = ref(1);
+const pageSize = 10;
+const filters = ref({ caseType: '', status: '', reportTimeRange: [] });
 
 const fetchCases = async () => {
   try {
     loading.value = true;
     const response = await caseApi.getAllCases();
     cases.value = response.data;
-    totalCases.value = response.data.length;
   } catch (error) {
     ElMessage.error("获取案件列表失败!");
   } finally {
@@ -66,6 +88,27 @@ const handlePageChange = (page) => {
   currentPage.value = page;
   fetchCases();
 };
+
+const resetFilters = () => {
+  filters.value = { caseType: '', status: '', reportTimeRange: [] };
+};
+
+const filteredCases = computed(() => {
+  const [start, end] = filters.value.reportTimeRange || [];
+  return (cases.value || []).filter(c => {
+    const typeOk = !filters.value.caseType || (c.caseType || '').includes(filters.value.caseType);
+    const statusOk = !filters.value.status || c.status === filters.value.status;
+    const timeOk = !start || !end ? true : (c.reportTime >= start && c.reportTime <= end);
+    return typeOk && statusOk && timeOk;
+  });
+});
+
+const pagedCases = computed(() => {
+  const startIdx = (currentPage.value - 1) * pageSize;
+  return filteredCases.value.slice(startIdx, startIdx + pageSize);
+});
+
+watch(filters, () => { currentPage.value = 1; }, { deep: true });
 
 const handleCreate = () => {
   router.push('/cases/create');

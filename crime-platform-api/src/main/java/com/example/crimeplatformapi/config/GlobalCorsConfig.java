@@ -16,7 +16,7 @@ public class GlobalCorsConfig {
             // 2. 在参数前添加 @NonNull 注解
             public void addCorsMappings(@NonNull CorsRegistry registry) {
                 registry.addMapping("/**")
-                        .allowedOrigins("http://localhost:5173")
+                        .allowedOriginPatterns("http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:*", "http://127.0.0.1:*")
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);

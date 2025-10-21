@@ -10,7 +10,25 @@ const apiClient = axios.create({
     }
 });
 
-// 你也可以在这里添加请求拦截器，例如，未来用于附加认证 token
-// apiClient.interceptors.request.use(config => { ... });
+// 附加认证 token 拦截器
+apiClient.interceptors.request.use(config => {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
+
+// 全局响应错误处理（未授权等）
+apiClient.interceptors.response.use(
+    r => r,
+    err => {
+        if (err?.response?.status === 401) {
+            localStorage.removeItem('auth_token');
+            window.location.href = '/login';
+        }
+        return Promise.reject(err);
+    }
+);
 
 export default apiClient;

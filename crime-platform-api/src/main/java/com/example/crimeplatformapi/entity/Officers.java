@@ -3,6 +3,7 @@ package com.example.crimeplatformapi.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -19,10 +20,23 @@ public class Officers {
 
     @Column(name = "position", length = 50)
     private String position;
-
-    // --- 关系映射 ---
-    // 一个 Officer 对应一个 Person，是一对一关系
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "person_id", referencedColumnName = "person_id", nullable = false, unique = true)
-    private Persons person;
+    
+    // 警员基本信息（独立于 Persons 表）
+    @Column(name = "name", nullable = false, length = 50)
+    private String name;
+    
+    @Column(name = "id_number", nullable = false, length = 18)
+    private String idNumber;
+    
+    @Column(name = "gender", nullable = false)
+    private String gender;
+    
+    @Column(name = "birth_date")
+    private LocalDate birthDate;
+    
+    @Column(name = "address")
+    private String address;
+    
+    @Column(name = "contact_info", length = 100)
+    private String contactInfo;
 }

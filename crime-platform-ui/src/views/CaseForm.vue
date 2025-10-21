@@ -8,12 +8,14 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="案件标题" prop="caseTitle" required>
-              <el-input v-model="form.caseTitle" />
+              <el-input v-model="form.caseTitle" placeholder="请输入案件标题" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="案件类型" prop="caseType" required>
-              <el-input v-model="form.caseType" />
+              <el-select v-model="form.caseType" placeholder="请选择类型" style="width: 100%;">
+                <el-option v-for="t in CASE_TYPES" :key="t" :label="t" :value="t" />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -32,19 +34,68 @@
                 v-model="form.reportTime"
                 type="datetime"
                 placeholder="选择报案时间"
-                value-format="YYYY-MM-DDTHH:mm:ss"
+                format="YYYY-MM-DD HH:mm:ss"
+                value-format="YYYY-MM-DD HH:mm:ss"
                 style="width: 100%;"
               />
             </el-form-item>
           </el-col>
-          <el-col :span="24">
-            <el-form-item label="案发地点" prop="locationAddress" required>
-              <el-input v-model="form.locationAddress" placeholder="请输入详细案发地点" />
+          <el-col :span="12" v-if="form.status === '立案侦查' || form.status === '已告破' || form.status === '已归档'">
+            <el-form-item label="立案时间" prop="filingTime">
+              <el-date-picker
+                v-model="form.filingTime"
+                type="datetime"
+                placeholder="选择立案时间"
+                format="YYYY-MM-DD HH:mm:ss"
+                value-format="YYYY-MM-DD HH:mm:ss"
+                style="width: 100%;"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12" v-if="form.status === '已告破' || form.status === '已归档'">
+            <el-form-item label="侦破时间" prop="solveTime">
+              <el-date-picker
+                v-model="form.solveTime"
+                type="datetime"
+                placeholder="选择侦破时间"
+                format="YYYY-MM-DD HH:mm:ss"
+                value-format="YYYY-MM-DD HH:mm:ss"
+                style="width: 100%;"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12" v-if="form.status === '已归档'">
+            <el-form-item label="归档时间" prop="archiveTime">
+              <el-date-picker
+                v-model="form.archiveTime"
+                type="datetime"
+                placeholder="选择归档时间"
+                format="YYYY-MM-DD HH:mm:ss"
+                value-format="YYYY-MM-DD HH:mm:ss"
+                style="width: 100%;"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="行政区" prop="district" required>
+              <el-select v-model="form.district" placeholder="请选择行政区" style="width: 100%;">
+                <el-option v-for="district in SHANGHAI_DISTRICTS" :key="district" :label="district" :value="district" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="详细地址" prop="address" required>
+              <el-input v-model="form.address" placeholder="请输入详细地址" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
             <el-form-item label="案件描述" prop="description">
-              <el-input v-model="form.description" type="textarea" :rows="4" />
+              <el-input
+                v-model="form.description"
+                type="textarea"
+                :rows="4"
+                placeholder="请输入案件详细描述"
+              />
             </el-form-item>
           </el-col>
         </el-row>
@@ -66,58 +117,180 @@ import { ElMessage } from 'element-plus';
 const route = useRoute();
 const router = useRouter();
 const formRef = ref(null);
-const isEditMode = computed(() => !!route.params.id);
-const pageTitle = computed(() => isEditMode.value ? '编辑案件' : '新建案件');
-const isSubmitting = ref(false);
-
 const form = ref({
   caseTitle: '',
   caseType: '',
   status: '已接报',
   reportTime: '',
-  description: '',
-  locationAddress: '',
+  filingTime: '',
+  solveTime: '',
+  archiveTime: '',
+  district: '',
+  address: '',
+  description: ''
 });
+const isSubmitting = ref(false);
+const loading = ref(false);
 
-onMounted(async () => {
-  if (isEditMode.value) {
-    const caseId = route.params.id;
-    try {
-      const response = await caseApi.getCaseById(caseId);
-      const data = response.data;
-      form.value = {
-        caseTitle: data.caseTitle,
-        caseType: data.caseType,
-        status: data.status,
-        reportTime: data.reportTime,
-        description: data.description,
-        locationAddress: data.location?.address || '',
-      };
-    } catch (error) {
-      ElMessage.error("获取案件详情失败！");
-    }
-  }
-});
+// 判断是编辑模式还是创建模式
+const isEditMode = computed(() => route.params.id);
+const pageTitle = computed(() => isEditMode.value ? '编辑案件' : '创建案件');
 
-const onSubmit = async () => {
-  isSubmitting.value = true;
+// 调试信息
+console.log('路由参数:', route.params);
+console.log('编辑模式:', isEditMode.value);
+
+// 上海市行政区列表
+const SHANGHAI_DISTRICTS = [
+  '黄浦区', '徐汇区', '长宁区', '静安区', '普陀区', '虹口区', '杨浦区',
+  '闵行区', '宝山区', '嘉定区', '浦东新区', '金山区', '松江区', '青浦区',
+  '奉贤区', '崇明区'
+];
+
+// 案件类型列表
+const CASE_TYPES = ['盗窃', '抢劫', '诈骗', '伤害', '其他'];
+
+// 格式化日期时间为 ISO 字符串
+const formatDateTime = (dateTime) => {
+  if (!dateTime) return null;
+  
   try {
-    if (isEditMode.value) {
-      await caseApi.updateCase(route.params.id, form.value);
-    } else {
-      await caseApi.createCase(form.value);
+    if (typeof dateTime === 'string') {
+      // 如果是字符串，确保格式正确
+      if (dateTime.includes('T')) {
+        return dateTime;
+      } else {
+        // 将 "YYYY-MM-DD HH:mm:ss" 格式转换为 "YYYY-MM-DDTHH:mm:ss"
+        return dateTime.replace(' ', 'T');
+      }
+    } else if (dateTime instanceof Date) {
+      // 如果是 Date 对象，转换为 ISO 字符串
+      return dateTime.toISOString();
     }
-    ElMessage.success('保存成功!');
-    router.push('/cases');
+    
+    return dateTime;
   } catch (error) {
-    ElMessage.error('保存失败，请检查表单数据或联系管理员！');
-    console.error("保存案件失败:", error.response?.data || error);
-  } finally {
-    isSubmitting.value = false;
+    console.error('日期时间格式化错误:', error);
+    return null;
   }
 };
 
-const onCancel = () => { router.push('/cases'); };
+// 加载案件数据（编辑模式）
+const loadCaseData = async () => {
+  if (!isEditMode.value) return;
+  
+  loading.value = true;
+  try {
+    const response = await caseApi.getCaseById(route.params.id);
+    const caseData = response.data;
+    
+    // 填充表单数据
+    form.value.caseTitle = caseData.caseTitle;
+    form.value.caseType = caseData.caseType;
+    form.value.status = caseData.status;
+    form.value.reportTime = caseData.reportTime;
+    form.value.filingTime = caseData.filingTime || '';
+    form.value.solveTime = caseData.solveTime || '';
+    form.value.archiveTime = caseData.archiveTime || '';
+    form.value.description = caseData.description || '';
+    
+    // 解析地址信息
+    if (caseData.location?.address) {
+      const address = caseData.location.address;
+      // 尝试从地址中提取行政区和详细地址
+      for (const district of SHANGHAI_DISTRICTS) {
+        if (address.includes(district)) {
+          form.value.district = district;
+          form.value.address = address.replace(district, '');
+          break;
+        }
+      }
+      // 如果没有找到匹配的行政区，将整个地址作为详细地址
+      if (!form.value.district) {
+        form.value.address = address;
+      }
+    }
+  } catch (error) {
+    console.error('加载案件数据失败:', error);
+    ElMessage.error('加载案件数据失败');
+    router.push('/cases');
+  } finally {
+    loading.value = false;
+  }
+};
+
+const onSubmit = async () => {
+  if (!formRef.value) return;
+  await formRef.value.validate(async (valid) => {
+    if (!valid) return;
+    isSubmitting.value = true;
+    try {
+      // 组合地址信息
+      const locationAddress = `${form.value.district}${form.value.address}`;
+      const caseData = {
+        caseTitle: form.value.caseTitle,
+        caseType: form.value.caseType,
+        status: form.value.status,
+        reportTime: formatDateTime(form.value.reportTime),
+        filingTime: formatDateTime(form.value.filingTime),
+        solveTime: formatDateTime(form.value.solveTime),
+        archiveTime: formatDateTime(form.value.archiveTime),
+        description: form.value.description,
+        locationAddress: locationAddress
+      };
+      
+      console.log('发送的案件数据:', caseData);
+      console.log('当前模式:', isEditMode.value ? '编辑' : '创建');
+      console.log('案件ID:', route.params.id);
+      console.log('原始日期时间:', form.value.reportTime);
+      console.log('格式化后日期时间:', formatDateTime(form.value.reportTime));
+      
+      if (isEditMode.value) {
+        // 编辑模式：更新案件
+        console.log('调用更新API，案件ID:', route.params.id);
+        await caseApi.updateCase(route.params.id, caseData);
+        ElMessage.success('案件更新成功！');
+      } else {
+        // 创建模式：新建案件
+        console.log('调用创建API');
+        await caseApi.createCase(caseData);
+        ElMessage.success('案件创建成功！');
+      }
+      
+      router.push('/cases');
+    } catch (error) {
+      console.error('案件操作失败:', error);
+      console.error('错误详情:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      let errorMessage = '保存失败，请重试！';
+      if (error.response?.status === 400) {
+        errorMessage = '请求数据格式错误，请检查输入信息';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      ElMessage.error(errorMessage);
+    } finally {
+      isSubmitting.value = false;
+    }
+  });
+};
+
+const onCancel = () => {
+  router.push('/cases');
+};
+
+// 组件挂载时加载数据
+onMounted(() => {
+  loadCaseData();
+});
 </script>
 
 <style scoped>

@@ -57,14 +57,16 @@
   </template>
   
   <script setup>
-  import { ref } from 'vue';
-  import { useRouter } from 'vue-router';
+  import { ref, onMounted } from 'vue';
+  import { useRouter, useRoute } from 'vue-router';
   import personApi from '@/api/person.js';
   import { ElMessage } from 'element-plus';
   
   const router = useRouter();
+  const route = useRoute();
   const formRef = ref(null);
   const isSubmitting = ref(false);
+  const isEdit = ref(false);
   
   const form = ref({
     name: '',
@@ -75,16 +77,30 @@
     address: '',
   });
   
+  onMounted(async () => {
+    if (route.params.id) {
+      isEdit.value = true;
+      try {
+        const res = await personApi.getPersonById(route.params.id);
+        Object.assign(form.value, res.data || {});
+      } catch (e) {
+        ElMessage.error('加载人员失败');
+      }
+    }
+  });
+
   const onSubmit = async () => {
     isSubmitting.value = true;
     try {
-      // 过滤掉空的 birthDate 字段，避免后端解析错误
       const payload = { ...form.value };
-      if (!payload.birthDate) {
-        delete payload.birthDate;
+      if (!payload.birthDate) delete payload.birthDate;
+      if (isEdit.value) {
+        await personApi.updatePerson(route.params.id, payload);
+        ElMessage.success('保存成功!');
+      } else {
+        await personApi.createPerson(payload);
+        ElMessage.success('人员登记成功!');
       }
-      await personApi.createPerson(payload);
-      ElMessage.success('人员登记成功!');
       router.push('/persons');
     } catch (error) {
       ElMessage.error('登记失败，请检查数据！');

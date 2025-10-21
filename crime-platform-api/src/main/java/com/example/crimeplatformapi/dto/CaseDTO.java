@@ -9,5 +9,8 @@ public record CaseDTO(
         String caseType,
         String status,
         LocalDateTime reportTime,
+        LocalDateTime filingTime,
+        LocalDateTime solveTime,
+        LocalDateTime archiveTime,
         String locationAddress // 关联地点的地址
 ) {}

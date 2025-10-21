@@ -10,6 +10,9 @@ public record CaseDetailDTO(
         String caseType,
         String status,
         LocalDateTime reportTime,
+        LocalDateTime filingTime,
+        LocalDateTime solveTime,
+        LocalDateTime archiveTime,
         String description,
         LocationDTO location, // 嵌套地点的DTO
         Set<OfficerDTO> officers, // 办案警员列表

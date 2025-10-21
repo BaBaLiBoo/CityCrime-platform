@@ -17,8 +17,8 @@ public class CasePersonsId implements Serializable {
     @Column(name = "case_id")
     private Integer caseId;
 
-    @Column(name = "person_id")
-    private Integer personId;
+    @Column(name = "id_number")
+    private String idNumber;
 
     // --- 新增的字段 ---
     // 将 role_in_case 添加为复合主键的一部分，与数据库表结构保持一致
