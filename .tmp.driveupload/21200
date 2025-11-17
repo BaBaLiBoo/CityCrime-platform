@@ -1,0 +1,8 @@
+refactor: Consolidate database initialization and structure repair scripts
+
+- Update database initialization script to reflect new system name and structure
+- Merge case and person table repair scripts into a single comprehensive script
+- Enhance role-permission assignments for various user types
+- Add multimedia file handling in case details
+- Implement user interface improvements for better navigation and user experience
+- Clean up unused files and components in the UI
