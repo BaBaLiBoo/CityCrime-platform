@@ -3,3 +3,4 @@
 223cbd89d410261fa17e08710f70065f7f368b67 84cecfed2411be572266c9f87cf7d32b338c17e3 BaBaLiBoo <2354096@tongji.edu.cn> 1761051607 +0800	commit (amend): feat: 瀹屾垚涓婃捣甯傜姱缃簨浠剁鐞嗗钩鍙版牳蹇冨姛鑳?
 84cecfed2411be572266c9f87cf7d32b338c17e3 438ff5174e7b8aca564aae7c401a36ea6b792c04 BaBaLiBoo <2354096@tongji.edu.cn> 1761051637 +0800	commit (amend): feat: Complete Shanghai Crime Management Platform Core Features
 438ff5174e7b8aca564aae7c401a36ea6b792c04 a70c59cbcf1603fccd88370ae8e10a7790ad33fa BaBaLiBoo <2953287447cc@gmail.com> 1763375133 +0800	commit: refactor: Consolidate database initialization and structure repair scripts
+a70c59cbcf1603fccd88370ae8e10a7790ad33fa 4fd7d21024758b272452b5f686dde377d57e92ca BaBaLiBoo <2953287447cc@gmail.com> 1763375609 +0800	commit: 完成用户端开发
