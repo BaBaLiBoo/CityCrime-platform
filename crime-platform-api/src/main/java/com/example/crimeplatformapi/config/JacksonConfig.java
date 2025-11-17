@@ -60,7 +60,7 @@ public class JacksonConfig {
                 }
             }
             
-            throw new IOException("无法解析日期时间: " + dateString);
+            throw new IOException(String.format("无法解析日期时间: %s", dateString));
         }
     }
 }
