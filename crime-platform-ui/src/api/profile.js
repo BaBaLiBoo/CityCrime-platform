@@ -6,6 +6,9 @@ export default {
   },
   updateProfile(data) {
     return apiClient.put('/auth/profile', data);
+  },
+  changePassword(data) {
+    return apiClient.put('/auth/password', data);
   }
 };
 

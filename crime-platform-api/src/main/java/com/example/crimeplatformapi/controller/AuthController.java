@@ -12,7 +12,9 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -106,6 +108,16 @@ public class AuthController {
         public void setAddress(String address) { this.address = address; }
         public String getContactInfo() { return contactInfo; }
         public void setContactInfo(String contactInfo) { this.contactInfo = contactInfo; }
+    }
+
+    public static class ChangePasswordRequest {
+        private String oldPassword;
+        private String newPassword;
+
+        public String getOldPassword() { return oldPassword; }
+        public void setOldPassword(String oldPassword) { this.oldPassword = oldPassword; }
+        public String getNewPassword() { return newPassword; }
+        public void setNewPassword(String newPassword) { this.newPassword = newPassword; }
     }
 
     @PostMapping("/login")
@@ -228,6 +240,28 @@ public class AuthController {
             response.put("message", "该身份证号已被注册");
             return ResponseEntity.status(409).body(response);
         }
+
+        if (idNumber != null) {
+            idNumber = idNumber.trim().toUpperCase();
+            req.setIdNumber(idNumber);
+        }
+        if (!isValidChineseId(idNumber)) {
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "身份证号格式或校验码不正确");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        LocalDate providedBirthDate = null;
+        String providedBirthDateStr = req.getBirthDate();
+        if (providedBirthDateStr != null && !providedBirthDateStr.trim().isEmpty()) {
+            try {
+                providedBirthDate = LocalDate.parse(providedBirthDateStr.trim());
+            } catch (DateTimeParseException e) {
+                Map<String, String> response = new HashMap<>();
+                response.put("message", "出生日期格式应为YYYY-MM-DD");
+                return ResponseEntity.badRequest().body(response);
+            }
+        }
         
         try {
             // 创建 UserAccount
@@ -236,23 +270,17 @@ public class AuthController {
             account.setPasswordHash(req.getPassword());
             account.setUserType(req.getUserType() != null ? req.getUserType() : "普通用户");
             account.setRealName(req.getRealName());
-            account.setIdNumber(req.getIdNumber());
+            account.setIdNumber(idNumber);
             account.setCreatedAt(LocalDateTime.now());
 
             UserAccounts saved = userAccountsRepository.save(account);
             
             // 同步创建Persons记录
             Persons person = new Persons();
-            person.setIdNumber(req.getIdNumber());
+            person.setIdNumber(idNumber);
             person.setName(req.getRealName());
             person.setGender(req.getGender());
-            if (req.getBirthDate() != null && !req.getBirthDate().trim().isEmpty()) {
-                try {
-                    person.setBirthDate(java.time.LocalDate.parse(req.getBirthDate()));
-                } catch (Exception e) {
-                    // 日期解析失败，忽略
-                }
-            }
+            person.setBirthDate(providedBirthDate);
             person.setAddress(req.getAddress());
             person.setContactInfo(req.getContactInfo());
             personsRepository.save(person);
@@ -368,8 +396,10 @@ public class AuthController {
         if (requestedIdNumber == null || requestedIdNumber.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Java17Compat.mapOf("message", "身份证号不能为空"));
         }
-        if (requestedIdNumber.length() != 18) {
-            return ResponseEntity.badRequest().body(Java17Compat.mapOf("message", "身份证号必须是18位"));
+        final String normalizedIdNumber = requestedIdNumber.trim().toUpperCase();
+        req.setIdNumber(normalizedIdNumber);
+        if (!isValidChineseId(normalizedIdNumber)) {
+            return ResponseEntity.badRequest().body(Java17Compat.mapOf("message", "身份证号格式或校验码不正确"));
         }
         if (req.getGender() == null || req.getGender().trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Java17Compat.mapOf("message", "请选择性别"));
@@ -380,28 +410,33 @@ public class AuthController {
 
         UserAccounts user = userOpt.get();
         String oldIdNumber = user.getIdNumber();
-        if (oldIdNumber != null && !oldIdNumber.equals(requestedIdNumber)) {
+        if (oldIdNumber != null && !oldIdNumber.equals(normalizedIdNumber)) {
             return ResponseEntity.badRequest().body(Java17Compat.mapOf("message", "身份证号已实名认证，如需修改请联系管理员"));
+        }
+        if (user.getRealName() != null && !user.getRealName().trim().isEmpty()
+                && !user.getRealName().equals(req.getRealName())) {
+            return ResponseEntity.badRequest().body(Java17Compat.mapOf("message", "真实姓名已认证，如需修改请联系管理员"));
         }
 
         LocalDate birthDate = null;
-        if (req.getBirthDate() != null && !req.getBirthDate().trim().isEmpty()) {
+        String birthDateStr = req.getBirthDate();
+        if (birthDateStr != null && !birthDateStr.trim().isEmpty()) {
             try {
-                birthDate = LocalDate.parse(req.getBirthDate());
+                birthDate = LocalDate.parse(birthDateStr.trim());
             } catch (DateTimeParseException e) {
                 return ResponseEntity.badRequest().body(Java17Compat.mapOf("message", "出生日期格式应为YYYY-MM-DD"));
             }
         }
 
         user.setRealName(req.getRealName());
-        user.setIdNumber(requestedIdNumber);
+        user.setIdNumber(normalizedIdNumber);
         userAccountsRepository.save(user);
 
-        Persons person = personsRepository.findById(requestedIdNumber).orElseGet(() -> {
-            Persons p = new Persons();
-            p.setIdNumber(requestedIdNumber);
-            return p;
-        });
+        Persons person = personsRepository.findById(Objects.requireNonNull(normalizedIdNumber)).orElse(null);
+        if (person == null) {
+            person = new Persons();
+            person.setIdNumber(Objects.requireNonNull(normalizedIdNumber));
+        }
         person.setName(req.getRealName());
         person.setGender(req.getGender());
         person.setBirthDate(birthDate);
@@ -421,6 +456,40 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @PutMapping("/password")
+    public ResponseEntity<?> changePassword(
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            @RequestBody ChangePasswordRequest req) {
+        Integer userId = extractUserIdFromAuthHeader(auth);
+        if (userId == null) {
+            return ResponseEntity.status(401).body(Java17Compat.mapOf("message", "未认证"));
+        }
+        if (req.getOldPassword() == null || req.getOldPassword().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Java17Compat.mapOf("message", "请输入当前密码"));
+        }
+        if (req.getNewPassword() == null || req.getNewPassword().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Java17Compat.mapOf("message", "新密码不能为空"));
+        }
+        if (req.getNewPassword().trim().length() < 6) {
+            return ResponseEntity.badRequest().body(Java17Compat.mapOf("message", "新密码长度至少为6位"));
+        }
+        Optional<UserAccounts> userOpt = userAccountsRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(Java17Compat.mapOf("message", "用户不存在"));
+        }
+        UserAccounts user = userOpt.get();
+        String storedPassword = user.getPasswordHash();
+        if (storedPassword == null || !storedPassword.equals(req.getOldPassword())) {
+            return ResponseEntity.badRequest().body(Java17Compat.mapOf("message", "当前密码不正确"));
+        }
+        if (req.getOldPassword().equals(req.getNewPassword())) {
+            return ResponseEntity.badRequest().body(Java17Compat.mapOf("message", "新密码不能与当前密码相同"));
+        }
+        user.setPasswordHash(req.getNewPassword().trim());
+        userAccountsRepository.save(user);
+        return ResponseEntity.ok(Java17Compat.mapOf("message", "密码已更新"));
+    }
+
     private Integer extractUserIdFromAuthHeader(String auth) {
         if (auth == null || !auth.startsWith("Bearer dummy-token-")) {
             return null;
@@ -432,6 +501,28 @@ public class AuthController {
             return null;
         }
     }
+
+    private static final Pattern CHINA_ID_PATTERN =
+            Pattern.compile("^[1-9]\\d{5}(19|20)\\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\\d|3[01])\\d{3}[\\dXx]$");
+
+    private boolean isValidChineseId(String idNumber) {
+        if (idNumber == null) {
+            return false;
+        }
+        String upper = idNumber.trim().toUpperCase();
+        if (!CHINA_ID_PATTERN.matcher(upper).matches()) {
+            return false;
+        }
+        int[] weight = {7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2};
+        char[] checkCode = {'1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2'};
+        int sum = 0;
+        for (int i = 0; i < 17; i++) {
+            sum += (upper.charAt(i) - '0') * weight[i];
+        }
+        char expected = checkCode[sum % 11];
+        return expected == upper.charAt(17);
+    }
+
 }
 
 

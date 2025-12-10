@@ -58,7 +58,7 @@
         <img src="/logo-shouhuzhe.svg" alt="守沪者 Logo" class="side-logo-img" />
         <div class="logo-text">
           <div class="logo-title">守沪者</div>
-          <div class="logo-subtitle">公众参与 · 报警与查询</div>
+          <div class="logo-subtitle">城市治安协同治理 · 公众端</div>
         </div>
       </div>
       <el-menu

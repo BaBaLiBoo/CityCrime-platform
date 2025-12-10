@@ -24,7 +24,11 @@
           <el-input v-model.trim="form.idNumber" placeholder="请输入18位身份证号" maxlength="18" />
         </el-form-item>
         <el-form-item label="性别" prop="gender" required>
-          <el-select v-model="form.gender" placeholder="请选择性别" style="width: 100%;">
+          <el-select
+            v-model="form.gender"
+            placeholder="请选择性别"
+            style="width: 100%;"
+          >
             <el-option label="男" value="男" />
             <el-option label="女" value="女" />
           </el-select>
@@ -54,7 +58,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import apiClient from '@/api/index.js';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
@@ -82,12 +86,32 @@ const validateConfirmPassword = (rule, value, callback) => {
   }
 };
 
-const validateIdNumber = (rule, value, callback) => {
-  if (value && value.length !== 18) {
-    callback(new Error('身份证号必须是18位'));
-  } else {
-    callback();
+const CHINA_ID_REGEX = /^[1-9]\d{5}(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]$/;
+const ID_WEIGHTS = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
+const ID_CHECK_CODES = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2'];
+
+const isValidChineseId = (value) => {
+  if (!value) return false;
+  const upper = value.trim().toUpperCase();
+  if (!CHINA_ID_REGEX.test(upper)) return false;
+  let sum = 0;
+  for (let i = 0; i < 17; i += 1) {
+    sum += Number(upper[i]) * ID_WEIGHTS[i];
   }
+  const expected = ID_CHECK_CODES[sum % 11];
+  return expected === upper[17];
+};
+
+const validateIdNumber = (rule, value, callback) => {
+  if (!value) {
+    callback(new Error('请输入身份证号'));
+    return;
+  }
+  if (!isValidChineseId(value)) {
+    callback(new Error('身份证号格式或校验码不正确'));
+    return;
+  }
+  callback();
 };
 
 const rules = {
@@ -121,7 +145,7 @@ const onRegister = async () => {
         username: form.value.username,
         password: form.value.password,
         realName: form.value.realName,
-        idNumber: form.value.idNumber,
+        idNumber: form.value.idNumber?.trim().toUpperCase(),
         gender: form.value.gender,
         birthDate: form.value.birthDate || null,
         address: form.value.address || null,
@@ -138,6 +162,17 @@ const onRegister = async () => {
     }
   });
 };
+
+watch(
+  () => form.value.idNumber,
+  (val) => {
+    if (!val) return;
+    const upper = val.toUpperCase();
+    if (upper !== val) {
+      form.value.idNumber = upper;
+    }
+  }
+);
 
 const goLogin = () => {
   router.push('/login');
