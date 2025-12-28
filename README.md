@@ -1,5 +1,5 @@
-# 守沪者——基于公众参与的城市治安协同治理系统
-### 同济大学计算机专业数据库课设项目
+# “守沪者”——基于公众参与的城市治安协同治理系统
+### 同济大学数据库系统原理课程设计
 
 面向公众举报与公安协同的现代化案件管理平台，涵盖用户举报、案件研判、行政区数据可视化以及全链路品牌化体验。
 
@@ -38,8 +38,8 @@
 
 ### 1. 克隆项目
 ```bash
-git clone https://github.com/BaBaLiBoo/Database_project.git
-cd Database_project
+git clone https://github.com/BaBaLiBoo/CityCrime-platform.git
+cd CityCrime-platform
 ```
 
 ### 2. 初始化数据库
