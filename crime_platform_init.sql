@@ -1,8 +1,3 @@
--- =================================================================
--- 守沪者——基于公众参与的城市治安协同治理系统
--- 数据库初始化与结构修复脚本（合并版）
--- =================================================================
-
 SET NAMES 'utf8mb4';
 SET FOREIGN_KEY_CHECKS=0;
 
@@ -10,9 +5,6 @@ DROP DATABASE IF EXISTS `crime_platform_db`;
 CREATE DATABASE `crime_platform_db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `crime_platform_db`;
 
--- -----------------------------------------------------------------
--- 地理位置信息
--- -----------------------------------------------------------------
 CREATE TABLE `Locations` (
     `location_id` INT AUTO_INCREMENT PRIMARY KEY,
     `address` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '详细地址',
@@ -21,9 +13,6 @@ CREATE TABLE `Locations` (
     `latitude` DECIMAL(10, 8) COMMENT '纬度'
 ) ENGINE=InnoDB COMMENT='案件地点信息表';
 
--- -----------------------------------------------------------------
--- 人员基础信息（实名登记、涉案人员共用）
--- -----------------------------------------------------------------
 CREATE TABLE `Persons` (
     `id_number` VARCHAR(18) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '身份证号（主键）',
     `name` VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '姓名',
@@ -34,9 +23,6 @@ CREATE TABLE `Persons` (
     PRIMARY KEY (`id_number`)
 ) ENGINE=InnoDB COMMENT='涉案人员与实名信息表';
 
--- -----------------------------------------------------------------
--- 警员信息表
--- -----------------------------------------------------------------
 CREATE TABLE `Officers` (
     `officer_id` VARCHAR(20) NOT NULL COMMENT '警员编号',
     `department` VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '所属部门',
@@ -50,9 +36,6 @@ CREATE TABLE `Officers` (
     PRIMARY KEY (`officer_id`)
 ) ENGINE=InnoDB COMMENT='办案警员信息表';
 
--- -----------------------------------------------------------------
--- 系统登录账户
--- -----------------------------------------------------------------
 CREATE TABLE `user_accounts` (
     `user_id` INT AUTO_INCREMENT PRIMARY KEY,
     `officer_id` VARCHAR(20) NULL COMMENT '若为警员，可关联警号',
@@ -68,9 +51,6 @@ CREATE TABLE `user_accounts` (
         ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB COMMENT='系统登录账户表';
 
--- -----------------------------------------------------------------
--- 案件主表
--- -----------------------------------------------------------------
 CREATE TABLE `Cases` (
     `case_id` INT AUTO_INCREMENT PRIMARY KEY,
     `case_title` VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '案件标题',
@@ -93,9 +73,6 @@ CREATE TABLE `Cases` (
         ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB COMMENT='核心案件信息表';
 
--- -----------------------------------------------------------------
--- 案件与涉案人员关联
--- -----------------------------------------------------------------
 CREATE TABLE `Case_Persons` (
     `case_id` INT NOT NULL,
     `id_number` VARCHAR(18) NOT NULL,
@@ -109,9 +86,6 @@ CREATE TABLE `Case_Persons` (
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB COMMENT='案件与涉案人员关系表';
 
--- -----------------------------------------------------------------
--- 案件与警员关联
--- -----------------------------------------------------------------
 CREATE TABLE `Case_Officers` (
     `case_id` INT NOT NULL,
     `officer_id` VARCHAR(20) NOT NULL,
@@ -124,9 +98,6 @@ CREATE TABLE `Case_Officers` (
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB COMMENT='案件与办案警员关系表';
 
--- -----------------------------------------------------------------
--- 角色与权限（保留供扩展使用）
--- -----------------------------------------------------------------
 CREATE TABLE `Roles` (
     `role_id` INT AUTO_INCREMENT PRIMARY KEY,
     `role_name` VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci UNIQUE NOT NULL COMMENT '角色名称',
@@ -163,9 +134,6 @@ CREATE TABLE `User_Roles` (
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB COMMENT='用户与角色关系表';
 
--- -----------------------------------------------------------------
--- 索引
--- -----------------------------------------------------------------
 CREATE INDEX `idx_case_type` ON `Cases`(`case_type`);
 CREATE INDEX `idx_case_status` ON `Cases`(`status`);
 CREATE INDEX `idx_case_report_time` ON `Cases`(`report_time`);
@@ -174,9 +142,6 @@ CREATE INDEX `idx_location_district` ON `Locations`(`district`);
 CREATE INDEX `idx_user_username` ON `user_accounts`(`username`);
 CREATE INDEX `idx_user_type` ON `user_accounts`(`user_type`);
 
--- -----------------------------------------------------------------
--- 初始化字典数据
--- -----------------------------------------------------------------
 INSERT INTO `Roles` (`role_name`, `description`) VALUES
 ('系统管理员', '拥有系统最高管理权限，负责用户、角色和系统配置的管理。'),
 ('领导决策人员', '拥有查看所有案件信息和统计报表的权限，用于宏观决策。'),
@@ -220,6 +185,6 @@ WHERE r.role_name = '警务人员'
 
 SET FOREIGN_KEY_CHECKS=1;
 
-SELECT 'crime_platform_db 初始化完成（合并脚本）！' AS `Status`;
+SELECT 'crime_platform_db 初始化完成！' AS `Status`;
 
 
